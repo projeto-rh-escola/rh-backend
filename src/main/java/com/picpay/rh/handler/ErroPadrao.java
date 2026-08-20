@@ -1,8 +1,9 @@
 package com.picpay.rh.handler;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.time.OffsetDateTime;
 
 @Getter
 @Setter
@@ -12,5 +13,5 @@ public class ErroPadrao {
 
     private String mensagem;
 
-    private Long timestamp;
+    private OffsetDateTime timestamp;
 }
