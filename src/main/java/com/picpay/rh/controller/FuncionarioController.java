@@ -35,7 +35,7 @@ public class FuncionarioController implements FuncionarioSwagger {
 
     @Override
     @GetMapping("/{id}")
-    public ResponseEntity<Funcionario> consultarPorId(@RequestBody @PathVariable Long id) {
+    public ResponseEntity<Funcionario> consultarPorId(@PathVariable Long id) {
         Funcionario funcionario = funcionarioService.getFuncionarioById(id);
         return ResponseEntity.ok(funcionario);
     }
@@ -49,14 +49,14 @@ public class FuncionarioController implements FuncionarioSwagger {
 
     @Override
     @PatchMapping("/{id}")
-    public ResponseEntity<Funcionario> atualizarFuncionario(@Valid @RequestBody @PathVariable Long id, @RequestBody Funcionario funcionario) {
+    public ResponseEntity<Funcionario> atualizarFuncionario(@PathVariable Long id, @Valid @RequestBody Funcionario funcionario) {
         Funcionario funcionarioAtualizado = funcionarioService.patchFuncionario(id, funcionario);
         return ResponseEntity.ok(funcionarioAtualizado);
     }
 
     @Override
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletarFuncionario(@RequestBody @PathVariable Long id) {
+    public ResponseEntity<Void> deletarFuncionario(@PathVariable Long id) {
         funcionarioService.deleteFuncionario(id);
         return ResponseEntity.noContent().build();
     }

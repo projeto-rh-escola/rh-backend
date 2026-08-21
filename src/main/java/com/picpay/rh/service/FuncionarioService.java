@@ -2,30 +2,29 @@ package com.picpay.rh.service;
 
 import com.picpay.rh.exception.DadoDuplicadoException;
 import com.picpay.rh.exception.FuncionarioNaoEncontradoException;
+import com.picpay.rh.handler.FieldError;
 import com.picpay.rh.model.Funcionario;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 @Service
 public class FuncionarioService {
 
-    private ArrayList<Funcionario> funcionarios = new ArrayList<>();
+    private List<Funcionario> funcionarios = new ArrayList<>();
 
-    public FuncionarioService() {
-        this.funcionarios = new ArrayList<>();
+
+    public Funcionario addFuncionario(Funcionario funcionario) {
+        validarUnicidade(funcionario, null);
+        funcionario.setId(gerarId());
+        funcionarios.add(funcionario);
+        return funcionario;
     }
 
-    public Funcionario addFuncionario(Funcionario novoFuncionario) {
-        validarNomeUnico(novoFuncionario.getNome());
-        validarEmailUnico(novoFuncionario.getEmail());
-        validarTelefoneUnico(novoFuncionario.getTelefone());
-        novoFuncionario.setId(gerarId());
-        funcionarios.add(novoFuncionario);
-        return novoFuncionario;
-    }
-
-    public ArrayList<Funcionario> getFuncionarios() {
+    public List<Funcionario> getFuncionarios() {
         return funcionarios;
     }
 
@@ -36,10 +35,10 @@ public class FuncionarioService {
                 .orElseThrow(() -> new FuncionarioNaoEncontradoException(id));
     }
 
-    public ArrayList<Funcionario> getFuncionariosByStatus(String status) {
+    public List<Funcionario> getFuncionariosByStatus(String status) {
         return funcionarios.stream()
                 .filter(funcionario -> funcionario.getStatus().toString().equalsIgnoreCase(status))
-                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+                .collect(Collectors.toList());
     }
 
     public Funcionario patchFuncionario(Long id, Funcionario funcionario) {
@@ -48,16 +47,15 @@ public class FuncionarioService {
         }
 
         Funcionario funcionarioExistente = getFuncionarioById(id);
+        validarUnicidade(funcionario, funcionarioExistente);
+
         if (funcionario.getNome() != null) {
-            validarNomeUnico(funcionario.getNome());
             funcionarioExistente.setNome(funcionario.getNome());
         }
         if (funcionario.getEmail() != null) {
-            validarEmailUnico(funcionario.getEmail());
             funcionarioExistente.setEmail(funcionario.getEmail());
         }
         if (funcionario.getTelefone() != null) {
-            validarTelefoneUnico(funcionario.getTelefone());
             funcionarioExistente.setTelefone(funcionario.getTelefone());
         }
         if (funcionario.getCargo() != null) {
@@ -79,10 +77,9 @@ public class FuncionarioService {
 
     }
 
-    public Funcionario deleteFuncionario(Long id) {
+    public void deleteFuncionario(Long id) {
         Funcionario funcionario = getFuncionarioById(id);
         funcionarios.remove(funcionario);
-        return funcionario;
     }
 
     private Long gerarId() {
@@ -93,30 +90,38 @@ public class FuncionarioService {
         }
     }
 
-    private void validarEmailUnico(String email) {
-        boolean emailExiste = funcionarios.stream()
-                .anyMatch(f -> email.equals(f.getEmail()));
+    /**
+     * Valida nome, email e telefone. Acumula todos os conflitos antes de lançar exceção.
+     * No cadastro novo, funcionarioExistente é null. Na atualização, ignora campos que não mudaram.
+     */
+    private void validarUnicidade(Funcionario funcionarioNovo, Funcionario funcionarioExistente) {
+        Long idExistente = funcionarioExistente != null ? funcionarioExistente.getId() : null;
+        List<FieldError> erros = new ArrayList<>();
 
-        if (emailExiste) {
-            throw new DadoDuplicadoException("O email " + email + " já está cadastrado por outro candidato.");
+        if (funcionarioNovo.getNome() != null && (funcionarioExistente == null || !funcionarioNovo.getNome().equals(funcionarioExistente.getNome()))
+                && existeConflito(f -> funcionarioNovo.getNome().equals(f.getNome()), idExistente)) {
+            erros.add(new FieldError("nome", "O nome " + funcionarioNovo.getNome() + " já está em uso."));
+        }
+        if (funcionarioNovo.getEmail() != null && (funcionarioExistente == null || !funcionarioNovo.getEmail().equals(funcionarioExistente.getEmail()))
+                && existeConflito(f -> funcionarioNovo.getEmail().equals(f.getEmail()), idExistente)) {
+            erros.add(new FieldError("email", "O email " + funcionarioNovo.getEmail() + " já está cadastrado por outro candidato."));
+        }
+        if (funcionarioNovo.getTelefone() != null && (funcionarioExistente == null || !funcionarioNovo.getTelefone().equals(funcionarioExistente.getTelefone()))
+                && existeConflito(f -> funcionarioNovo.getTelefone().equals(f.getTelefone()), idExistente)) {
+            erros.add(new FieldError("telefone", "O telefone " + funcionarioNovo.getTelefone() + " já está em uso."));
+        }
+
+        if (!erros.isEmpty()) {
+            throw new DadoDuplicadoException(erros);
         }
     }
 
-    private void validarNomeUnico(String nome) {
-        boolean usuarioExiste = funcionarios.stream()
-                .anyMatch(f -> nome.equals(f.getNome()));
-
-        if (usuarioExiste) {
-            throw new DadoDuplicadoException("O nome " + nome + " já está em uso.");
-        }
-    }
-
-    private void validarTelefoneUnico(String telefone) {
-        boolean telefoneExiste = funcionarios.stream()
-                .anyMatch(f -> telefone.equals(f.getTelefone()));
-
-        if (telefoneExiste) {
-            throw new DadoDuplicadoException("O telefone " + telefone + " já está em uso.");
-        }
+    /**
+     * Verifica se existe algum funcionário na lista que atenda à condição, excluindo o próprio idExistente.
+     */
+    private boolean existeConflito(Predicate<Funcionario> condicao, Long idExistente) {
+        return funcionarios.stream()
+                .filter(f -> idExistente == null || !f.getId().equals(idExistente))
+                .anyMatch(condicao);
     }
 }
